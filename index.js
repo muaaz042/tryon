@@ -15,7 +15,6 @@ app.use(express.json()); // Middleware to parse JSON bodies
 // ✅ Routes
 // Import all your different route files
 const authRoutes = require('./routes/auth'); // For login/register
-const usersRoute = require('./routes/userRoutes'); // For user-specific API calls
 const adminRoute = require('./routes/adminRoutes'); // For admin-specific API calls
 const apiKeyRoutes = require('./routes/apiKeys');
 const accountRoutes = require('./routes/account');
@@ -24,8 +23,7 @@ const webhookRoutes = require('./routes/webhooks'); // <-- ADD THIS
 const apiV1Router = express.Router();
 apiV1Router.use(apiAuthMiddleware); 
 // Use your routes
-app.use('/auth', authRoutes);     // e.g., /auth/register, /auth/login
-app.use('/api/user', usersRoute);
+app.use('/auth', authRoutes);     
 app.use('/api/admin', adminRoute);
 app.use('/api/keys', apiKeyRoutes); 
 app.use('/v1', apiV1Router);

@@ -1,7 +1,5 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const Stripe = require('stripe'); // npm install stripe
 
 const router = express.Router();
