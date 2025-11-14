@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const Stripe = require('stripe'); // npm install stripe
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 /**

@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { requireLogin, adminOnly } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // --- IMPORTANT ---
 // This applies admin-only authentication to EVERY route in this file.

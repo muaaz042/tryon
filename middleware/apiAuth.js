@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { hashApiKey } = require('../utils/crypto'); // Import our new utility
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 /**
  * This is the core middleware for your paid API.

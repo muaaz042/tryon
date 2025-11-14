@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken'); // You'll need this
 
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 /**
  * POST /auth/register
  * Logs in a User or an Admin

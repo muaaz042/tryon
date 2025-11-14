@@ -74,6 +74,17 @@ model Admin {
   createdAt DateTime @default(now())
 }
 
+model GeminiApiKey {
+  id            Int      @id @default(autoincrement())
+  key           String   @unique @db.VarChar(255)
+  requestCount  Int      @default(0)
+  isRateLimited Boolean  @default(false)
+  lastUsedAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([isRateLimited, requestCount])
+}
+
 model ApiKey {
   id        Int          @id @default(autoincrement())
   name      String       @db.VarChar(100)

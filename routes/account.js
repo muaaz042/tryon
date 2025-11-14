@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { requireLogin } = require('../middleware/auth'); // Use JWT auth
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 /**
  * GET /api/account/status
  * Fetches the logged-in user's account status,

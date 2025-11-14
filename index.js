@@ -1,43 +1,92 @@
-// index.js (or app.js)
+// index.js
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { apiAuthMiddleware } = require('./middleware/apiAuth'); 
-dotenv.config();
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const { z } = require('zod');
+const { startScheduler } = require('./lib/scheduler');
 
+dotenv.config();
 const app = express();
 
-// ✅ Middleware
+// Define this constant so the error handler can use it
+const MAX_FILE_SIZE_MB = 10;
+
+// --- Core Middlewares ---
+app.use(helmet()); // Adds security headers
+app.use(express.static('public')); // Serves your index.html
+
+// Per your request, using open CORS.
+// For production, you should restrict this:
+// const corsOptions = { origin: process.env.CORS_ORIGIN };
+// app.use(cors(corsOptions));
 app.use(cors());
-app.use(express.json()); // Middleware to parse JSON bodies
 
-
-// ✅ Routes
-// Import all your different route files
-const authRoutes = require('./routes/auth'); // For login/register
-const adminRoute = require('./routes/adminRoutes'); // For admin-specific API calls
-const apiKeyRoutes = require('./routes/apiKeys');
-const accountRoutes = require('./routes/account');
-const webhookRoutes = require('./routes/webhooks'); // <-- ADD THIS
- // <-- ADD THIS
-const apiV1Router = express.Router();
-apiV1Router.use(apiAuthMiddleware); 
-// Use your routes
-app.use('/auth', authRoutes);     
-app.use('/api/admin', adminRoute);
-app.use('/api/keys', apiKeyRoutes); 
-app.use('/v1', apiV1Router);
-app.use('/api/account', accountRoutes);
+// --- Webhook Routes (Must come BEFORE express.json()) ---
+// Stripe requires the raw body to verify signatures.
+const webhookRoutes = require('./routes/webhooks');
 app.use('/webhooks', webhookRoutes);
-// <-- ADD THIS (e.g., POST /api/keys)
-// Simple health check route
-app.get("/", (req, res) => {
-  res.send("Virtual Try-On API Server is running.");
+
+// --- General Middlewares ---
+app.use(express.json()); // Middleware to parse JSON bodies for all other routes
+
+// --- Rate Limiter Definitions ---
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: 'Too many requests from this IP, please try again after 15 minutes',
 });
 
+const authLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10, // Limit each IP to 10 auth attempts per window
+  message: 'Too many login/register attempts, please try again later.',
+});
 
-// ✅ Start server
-const PORT = process.env.PORT || 5000; // Use port 5000 or 3000, just be consistent
+// --- API & Dashboard Routes ---
+const authRoutes = require('./routes/auth');
+const adminRoute = require('./routes/adminRoutes');
+const apiKeyRoutes = require('./routes/apiKeys');
+const accountRoutes = require('./routes/account');
+const productRoutes = require('./routes/product'); // Your new product routes
+
+// --- Apply Routes & Limiters ---
+app.use('/auth', authLimiter, authRoutes);
+app.use('/api/admin', adminRoute);      // Auth is handled *inside* adminRoutes
+app.use('/api/keys', apiKeyRoutes);      // Auth is handled *inside* apiKeyRoutes
+app.use('/api/account', accountRoutes);  // Auth is handled *inside* accountRoutes
+app.use('/v1', apiLimiter, productRoutes); // Your product API (e.g., /v1/try-on)
+
+// --- Health Check Route ---
+app.get("/", (req, res) => {
+  res.redirect('/v1/health'); // Redirect root to product health check
+});
+
+// --- Central Error Handler (Must be last) ---
+app.use((err, req, res, next) => {
+  console.error(err.stack); // Log the full error
+  
+  if (err instanceof z.ZodError) {
+    return res.status(400).json({
+      message: 'Validation failed',
+      errors: err.flatten().fieldErrors, // Correct Zod error formatting
+    });
+  }
+  
+  // Handle file too large error from Multer
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      message: `File too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`
+    });
+  }
+  
+  res.status(500).json({ message: 'Internal server error' });
+});
+
+// --- Start Server & Scheduler ---
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port: ${PORT}`);
+  startScheduler(); // Start the daily API key reset job
 });
