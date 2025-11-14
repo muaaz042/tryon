@@ -86,4 +86,78 @@ router.post('/', requireLogin, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/keys
+ * Lists all API keys for the currently logged-in user.
+ */
+router.get('/', requireLogin, async (req, res) => {
+  try {
+    const keys = await prisma.apiKey.findMany({
+      where: {
+        userId: req.user.id,
+      },
+      // IMPORTANT: Only select safe fields.
+      // NEVER send the keyHash back to the client.
+      select: {
+        id: true,
+        name: true,
+        keyPrefix: true,
+        status: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json(keys);
+  } catch (error) {
+    console.error('Error fetching API keys:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// --- 👇 ADD THIS NEW ROUTE ---
+
+/**
+ * DELETE /api/keys/:id
+ * Revokes (soft-deletes) an API key.
+ */
+router.delete('/:id', requireLogin, async (req, res) => {
+  try {
+    const keyId = parseInt(req.params.id);
+
+    // Check if keyId is a valid number
+    if (isNaN(keyId)) {
+      return res.status(400).json({ message: 'Invalid key ID.' });
+    }
+
+    // Use updateMany to ensure the user can only "delete" their own keys.
+    // This is more secure than finding then deleting.
+    const updateResult = await prisma.apiKey.updateMany({
+      where: {
+        id: keyId,
+        userId: req.user.id, // User can only update their OWN keys
+      },
+      data: {
+        status: 'revoked', // We set a status, not a hard delete
+      },
+    });
+
+    // updateMany returns a 'count' of records affected.
+    // If count is 0, it means no key was found *or* the user didn't own it.
+    if (updateResult.count === 0) {
+      return res.status(404).json({
+        message: 'API key not found or you do not have permission to revoke it.',
+      });
+    }
+
+    res.status(200).json({ message: 'API key revoked successfully.' });
+  } catch (error) {
+    console.error('Error revoking API key:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 module.exports = router;
