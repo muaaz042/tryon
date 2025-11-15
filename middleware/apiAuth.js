@@ -40,8 +40,7 @@ const apiAuthMiddleware = async (req, res, next) => {
         });
       }
     } catch (logError) {
-      console.error('Error in API log "finish" event:', logError);
-    }
+next(logError);    }
   });
 
   // --- Main Authentication & Authorization Logic ---
@@ -129,7 +128,7 @@ const apiAuthMiddleware = async (req, res, next) => {
     prisma.apiKey.update({
       where: { id: key.id },
       data: { lastUsedAt: new Date() }
-    }).catch(err => console.error('Failed to update lastUsedAt:', err));
+    }).catch(err => next(err));
     
     // Attach user and plan info to the request for the main controller to use
     req.user = key.user;
