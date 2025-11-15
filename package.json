@@ -6,8 +6,10 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "db:migrate": "dotenv -- npx prisma migrate deploy",
-    "db:dev": "dotenv -- npx prisma migrate dev"
-
+    "db:dev": "dotenv -- npx prisma migrate dev",
+    "prisma:seed": "node test/seed.js",
+    "db:reset": "npx prisma migrate reset --force",
+    "test:api": "node test/test_endpoints.js"
   },
   "keywords": [],
   "author": "",
