@@ -82,7 +82,7 @@ router.post('/', requireLogin, async (req, res) => {
     }
 
     console.error('Error creating API key:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
@@ -115,7 +115,7 @@ router.get('/', requireLogin, async (req, res) => {
     res.json(keys);
   } catch (error) {
     console.error('Error fetching API keys:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
@@ -158,7 +158,7 @@ router.delete('/:id', requireLogin, async (req, res) => {
     res.status(200).json({ message: 'API key revoked successfully.' });
   } catch (error) {
     console.error('Error revoking API key:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });

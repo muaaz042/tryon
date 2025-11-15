@@ -43,7 +43,7 @@ router.get('/users', async (req, res) => {
     res.json(users);
   } catch (error) {
     console.error('Admin error fetching users:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
@@ -114,7 +114,7 @@ router.get('/users/:id', async (req, res) => {
     res.json(user);
   } catch (error) {
     console.error(`Admin error fetching user ${userId}:`, error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
@@ -157,7 +157,7 @@ router.patch('/users/:id/status', async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
     console.error(`Admin error updating status for user ${userId}:`, error);
-    res.status(500).json({ message: 'Failed to update user status.' });
+ 
     next(error);
   }
 });

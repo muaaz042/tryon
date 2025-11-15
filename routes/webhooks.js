@@ -1,5 +1,4 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const Stripe = require('stripe'); // npm install stripe
 
 const router = express.Router();
@@ -42,7 +41,7 @@ router.post('/rapidapi', express.json(), async (req, res) => {
       // This is bad. It means our DB is out of sync with RapidAPI.
       console.error(`Webhook Error: Plan not found: ${planName}`);
       // Send 500 so RapidAPI retries, giving us time to fix it.
-      return res.status(500).send('Plan not found in database');
+
       next(error);
     }
 
@@ -116,7 +115,7 @@ router.post('/rapidapi', express.json(), async (req, res) => {
 
   } catch (error) {
     console.error('Webhook processing error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
@@ -230,7 +229,7 @@ router.post('/stripe', express.raw({type: 'application/json'}), async (req, res)
 
   } catch (error) {
     console.error('Stripe webhook processing error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);  
   }
 });

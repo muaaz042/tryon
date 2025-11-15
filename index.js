@@ -83,7 +83,7 @@ app.use((err, req, res, next) => {
   
   console.error('Error fetching data:', error);
   // 2. You send a generic 500 response here
-  res.status(500).json({ message: 'Internal server error' });
+
   next(error);
 
 });

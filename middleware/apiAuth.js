@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+
 const { hashApiKey } = require('../utils/crypto'); // Import our new utility
 
 const prisma = require('../lib/prisma');
@@ -140,7 +140,6 @@ const apiAuthMiddleware = async (req, res, next) => {
   } catch (error) {
     console.error('Error in API auth middleware:', error);
     // Don't send detailed error info to the client
-    res.status(500).json({ error: 'Internal server error.' });
     next(error);
   }
 };

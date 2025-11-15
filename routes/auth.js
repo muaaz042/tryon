@@ -1,5 +1,5 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+
 const bcrypt = require('bcryptjs');
 const { z } = require('zod'); // Import Zod
 const { createUserSchema ,loginSchema} = require('../services/validation'); // Import your schema
@@ -65,7 +65,7 @@ router.post('/register', async (req, res) => {
 
     // Handle all other errors
     console.error('Error during registration:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
@@ -147,7 +147,7 @@ router.post('/login', async (req, res) => {
     
     // Handle all other errors
     console.error('Error during login:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
     next(error);
   }
 });
