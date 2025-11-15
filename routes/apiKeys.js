@@ -1,12 +1,12 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto'); // Built-in Node.js module
 const { requireLogin } = require('../middleware/auth'); // Import auth middleware
 const { createApiKeySchema } = require('../validation'); // Import new schema
 const { z } = require('zod');
 
 const router = express.Router();
-const prisma = new new PrismaClient();
+const prisma = require('../lib/prisma');
+
 
 /**
  * Helper function to generate a secure API key
@@ -83,6 +83,7 @@ router.post('/', requireLogin, async (req, res) => {
 
     console.error('Error creating API key:', error);
     res.status(500).json({ message: 'Internal server error' });
+    next(error);
   }
 });
 
@@ -115,6 +116,7 @@ router.get('/', requireLogin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching API keys:', error);
     res.status(500).json({ message: 'Internal server error' });
+    next(error);
   }
 });
 
@@ -157,6 +159,7 @@ router.delete('/:id', requireLogin, async (req, res) => {
   } catch (error) {
     console.error('Error revoking API key:', error);
     res.status(500).json({ message: 'Internal server error' });
+    next(error);
   }
 });
 

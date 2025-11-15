@@ -11,7 +11,7 @@ dotenv.config();
 const app = express();
 
 // Define this constant so the error handler can use it
-const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_MB = 2;
 
 // --- Core Middlewares ---
 app.use(helmet()); // Adds security headers
@@ -50,8 +50,6 @@ const adminRoute = require('./routes/adminRoutes');
 const apiKeyRoutes = require('./routes/apiKeys');
 const accountRoutes = require('./routes/account');
 const productRoutes = require('./routes/product'); // Your new product routes
-const productApisRoutes = require('./routes/productApis'); // Your new product routes
-const subscriptionRoutes = require('./routes/subscriptions'); // Your new product routes
 
 // --- Apply Routes & Limiters ---
 app.use('/auth', authLimiter, authRoutes);
@@ -59,8 +57,6 @@ app.use('/api/admin', adminRoute);      // Auth is handled *inside* adminRoutes
 app.use('/api/keys', apiKeyRoutes);      // Auth is handled *inside* apiKeyRoutes
 app.use('/api/account', accountRoutes);  // Auth is handled *inside* accountRoutes
 app.use('/v1', apiLimiter, productRoutes); // Your product API (e.g., /v1/try-on)
-app.use('/subscription', accountRoutes);  // Auth is handled *inside* accountRoutes
-app.use('/product-api', productApisRoutes);  // Auth is handled *inside* accountRoutes
 
 // --- Health Check Route ---
 app.get("/", (req, res) => {
@@ -85,7 +81,11 @@ app.use((err, req, res, next) => {
     });
   }
   
+  console.error('Error fetching data:', error);
+  // 2. You send a generic 500 response here
   res.status(500).json({ message: 'Internal server error' });
+  next(error);
+
 });
 
 // --- Start Server & Scheduler ---

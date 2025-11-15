@@ -138,6 +138,7 @@ router.post('/try-on', upload, async (req, res) => {
     }
     console.error('Error in /v1/try-on:', error.message);
     res.status(500).json({ error: error.message || 'Failed to generate try-on.' });
+    next(error);
   }
 });
 

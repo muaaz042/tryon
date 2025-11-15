@@ -43,6 +43,7 @@ router.post('/rapidapi', express.json(), async (req, res) => {
       console.error(`Webhook Error: Plan not found: ${planName}`);
       // Send 500 so RapidAPI retries, giving us time to fix it.
       return res.status(500).send('Plan not found in database');
+      next(error);
     }
 
     // 3. --- Find the user ---
@@ -116,6 +117,7 @@ router.post('/rapidapi', express.json(), async (req, res) => {
   } catch (error) {
     console.error('Webhook processing error:', error);
     res.status(500).json({ message: 'Internal server error' });
+    next(error);
   }
 });
 
@@ -229,6 +231,7 @@ router.post('/stripe', express.raw({type: 'application/json'}), async (req, res)
   } catch (error) {
     console.error('Stripe webhook processing error:', error);
     res.status(500).json({ message: 'Internal server error' });
+    next(error);  
   }
 });
 

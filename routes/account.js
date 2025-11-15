@@ -1,5 +1,4 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { requireLogin } = require('../middleware/auth'); // Use JWT auth
 
 const router = express.Router();
@@ -86,6 +85,7 @@ router.get('/status', requireLogin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching account status:', error);
     res.status(500).json({ message: 'Internal server error' });
+    next(error);
   }
 });
 

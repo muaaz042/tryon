@@ -141,6 +141,7 @@ const apiAuthMiddleware = async (req, res, next) => {
     console.error('Error in API auth middleware:', error);
     // Don't send detailed error info to the client
     res.status(500).json({ error: 'Internal server error.' });
+    next(error);
   }
 };
 
