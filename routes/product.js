@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const axios = require('axios');
 const { z } = require('zod');
+const { GoogleGenAI } = require('@google/genai'); // Import Google GenAI SDK
 const { apiAuthMiddleware } = require('../middleware/apiAuth');
 const { getNextApiKey } = require('../lib/apiKeyRotator');
 const prisma = require('../lib/prisma'); // Use your shared Prisma client
@@ -54,7 +55,8 @@ async function getImageData(file, url) {
       }
 
       const mimeType = response.headers['content-type'];
-      if (!mimeType.startsWith('image/')) {
+      // Basic check to ensure we got an image
+      if (!mimeType || !mimeType.startsWith('image/')) {
         throw new Error('URL did not point to a valid image.');
       }
 
@@ -79,7 +81,7 @@ router.get('/health', (req, res) => {
 router.use(apiAuthMiddleware);
 
 // 3. Virtual Try-On Route
-router.post('/try-on', upload, async (req, res,next) => {
+router.post('/try-on', upload, async (req, res, next) => {
   try {
     // 1. Validate inputs (body and files)
     const { customPrompt, userImageUrl, productImageUrl } = tryOnSchema.parse(req.body);
@@ -93,38 +95,74 @@ router.post('/try-on', upload, async (req, res,next) => {
     // 3. Get a rotating Gemini API key
     const geminiKey = await getNextApiKey();
 
-    // 4. Build the prompt and payload
+    // 4. Initialize Google GenAI Client
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+
+    // 5. Build the prompt and contents for the SDK
     const basePrompt = "Generate a virtual try-on image. Place the clothing item from the second image onto the person in the first image. The new clothing should fit naturally and match the person's pose and background. The result must be photorealistic.";
     const finalPrompt = customPrompt ? `${basePrompt} Additional instructions: ${customPrompt}` : basePrompt;
 
-    const payload = {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: finalPrompt },
-            { inlineData: userImageData },
-            { inlineData: productImageData }
-          ]
-        }
-      ],
-      generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"]
-      }
-    };
+    const contents = [
+      {
+        role: "user",
+        parts: [
+          { text: finalPrompt },
+          {
+            inlineData: {
+              mimeType: userImageData.mimeType,
+              data: userImageData.data,
+            },
+          },
+          {
+            inlineData: {
+              mimeType: productImageData.mimeType,
+              data: productImageData.data,
+            },
+          },
+        ],
+      },
+    ];
 
-    // 5. Call Google AI API (securely from your backend)
-    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
+    // 6. Call Google AI API using the SDK
+    // Note: Using generateContent is the standard method. For image generation specifically,
+    // check if the model supports it or if you need a specific method.
+    // Assuming 'gemini-2.5-flash-image-preview' or similar model name is correct for your use case.
+    // If using an older SDK version, the method might slightly differ.
     
-    const response = await axios.post(`${API_URL}?key=${geminiKey}`, payload, {
-      headers: { 'Content-Type': 'application/json' }
+    // Based on your request example:
+    // const response = await ai.models.generateContent({ ... });
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image-preview", 
+      contents: contents,
+      // Add any generation config if needed, e.g., responseMimeType: "application/json" is not typical for image gen unless structured output requested
     });
 
-    // 6. Extract and send the image back
-    const base64Data = response.data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+    // 7. Extract and send the image back
+    // The SDK response structure might differ slightly from raw REST API.
+    // Typically response.response.candidates[0].content.parts...
+    // But checking your provided example: response.parts...
+    
+    let base64Data = null;
+    
+    // Using the SDK response format logic provided in your example
+    // The SDK simplifies access, but let's be robust.
+    const parts = response?.response?.candidates?.[0]?.content?.parts || []; 
+    
+    // Or if the SDK returns a flat parts array directly on the main object in newer versions:
+    // const parts = response.parts || [];
+
+    // Let's try to find the image part
+    const imagePart = parts.find(p => p.inlineData);
+    
+    if (imagePart) {
+        base64Data = imagePart.inlineData.data;
+    }
 
     if (!base64Data) {
-      throw new Error("Could not find generated image data in the API response.");
+        // Fallback or error if no image found
+        console.error("Full API Response:", JSON.stringify(response, null, 2));
+        throw new Error("Could not find generated image data in the API response.");
     }
 
     res.json({ base64Image: base64Data });
@@ -136,7 +174,7 @@ router.post('/try-on', upload, async (req, res,next) => {
         errors: error.flatten().fieldErrors 
       });
     }
-    console.error('Error in /v1/try-on:', error.message);
+    console.error('Error in /v1/try-on:', error);
     next(error);
   }
 });

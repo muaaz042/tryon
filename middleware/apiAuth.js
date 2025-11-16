@@ -1,144 +1,131 @@
-
-const { hashApiKey } = require('../utils/crypto'); // Import our new utility
-
+const { hashApiKey } = require('../utils/crypto'); 
 const prisma = require('../lib/prisma');
 
 /**
- * This is the core middleware for your paid API.
- * 1. Validates the API key.
- * 2. Checks if the user's subscription is active.
- * 3. Checks if the user is within their monthly quota.
- * 4. Logs the API call to the `ApiUsageLog` table after it finishes.
+ * API Authentication Middleware
+ * - Validates API Key
+ * - Checks Usage Limits (Quota)
+ * - Logs Usage
+ * - Allows "Free Tier" if no subscription is found
  */
 const apiAuthMiddleware = async (req, res, next) => {
   const startTime = Date.now();
+  
+  // Variables to hold data for the logging callback
   let apiKeyData = null;
   let userData = null;
 
-  // This event listener runs AFTER the response is sent
+  // --- Logging Logic (Runs after response is sent) ---
   res.on('finish', async () => {
     try {
       // Only log if we successfully identified a user and key
       if (apiKeyData && userData) {
         const responseTimeMs = Date.now() - startTime;
         
-        // This runs in the background. We don't 'await' it
-        // because we don't want to slow down the response.
-        prisma.apiUsageLog.create({
+        // Fire and forget - don't await this to keep response fast
+        await prisma.apiUsageLog.create({
           data: {
             userId: userData.id,
             apiKeyId: apiKeyData.id,
             httpMethod: req.method,
             endpoint: req.originalUrl,
-            httpStatusCode: res.statusCode, // This gets the FINAL status code
+            httpStatusCode: res.statusCode,
             responseTimeMs: responseTimeMs,
-            creditsConsumed: 1, // You can make this dynamic later
+            creditsConsumed: 1, 
           },
-        }).catch(err => {
-          // Log any errors from the logging itself
-          console.error('Failed to create API usage log:', err);
         });
       }
     } catch (logError) {
-next(logError);    }
+      // If logging fails, just print to console. 
+      // Do NOT call next(logError) because the response is already sent.
+      console.error('Failed to write API usage log:', logError.message);
+    }
   });
 
-  // --- Main Authentication & Authorization Logic ---
+  // --- Main Auth Logic ---
   try {
-    // 1. Get the API key from the header
+    // 1. Get API Key
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        error: 'Authorization header is missing or invalid. Use Bearer <api_key>.' 
-      });
+      return res.status(401).json({ error: 'Missing or invalid Authorization header.' });
     }
     const apiKey = authHeader.split(' ')[1];
-    if (!apiKey) {
-      return res.status(401).json({ error: 'API key is missing.' });
-    }
 
-    // 2. Hash the key and find it in the database
+    // 2. Find Key in DB
     const hashedKey = hashApiKey(apiKey);
-
-    // 3. Find the key, its user, their sub, and their plan all in one query
     const key = await prisma.apiKey.findUnique({
       where: { keyHash: hashedKey },
       include: {
         user: {
           include: {
             currentSubscription: {
-              include: {
-                plan: true // We need the plan to get the quota limits
-              }
+              include: { plan: true }
             }
           }
         }
       }
     });
 
-    // 4. --- Run all validation checks ---
-    
-    // Check 1: Is the key valid?
-    if (!key) {
-      return res.status(401).json({ error: 'Invalid API key.' });
-    }
+    if (!key) return res.status(401).json({ error: 'Invalid API key.' });
+    if (key.status === 'revoked') return res.status(403).json({ error: 'API key revoked.' });
+    if (key.user.accountStatus === 'suspended') return res.status(403).json({ error: 'Account suspended.' });
 
-    // --- Save user/key data for the 'finish' event logger ---
+    // Store for logging
     apiKeyData = key;
     userData = key.user;
 
-    // Check 2: Is the key revoked?
-    if (key.status === 'revoked') {
-      return res.status(403).json({ error: 'This API key has been revoked.' });
-    }
-
-    // Check 3: Is the user's account active?
-    if (key.user.accountStatus === 'suspended') {
-      return res.status(403).json({ error: 'User account is suspended.' });
-    }
-
-    // Check 4: Does the user have an active subscription?
+    // 3. Determine Limits (Handle Free Tier vs Paid)
     const subscription = key.user.currentSubscription;
-    if (!subscription || subscription.status !== 'active') {
-      return res.status(402).json({ error: 'Payment required. No active subscription found.' });
+    let requestLimit = 0;
+    let periodStart = new Date();
+    
+    // Default "Free Tier" limits if no active subscription
+    // You can adjust these numbers
+    const FREE_TIER_LIMIT = 5; 
+    
+    if (subscription && subscription.status === 'active') {
+        requestLimit = subscription.plan.requestLimitMonthly;
+        periodStart = subscription.currentPeriodStart;
+    } else {
+        // User has no sub or it's inactive -> Apply Free Tier
+        requestLimit = FREE_TIER_LIMIT;
+        // For free tier, just check usage for the last 30 days
+        periodStart = new Date();
+        periodStart.setDate(periodStart.getDate() - 30);
     }
 
-    // Check 5: Are they over their monthly quota?
-    const plan = subscription.plan;
-    const periodStart = subscription.currentPeriodStart;
-    
+    // 4. Check Quota
     const usageCount = await prisma.apiUsageLog.count({
       where: {
         userId: key.userId,
-        requestTimestamp: { 
-          gte: periodStart // gte = "greater than or equal to"
-        }
+        requestTimestamp: { gte: periodStart }
       }
     });
 
-    if (usageCount >= plan.requestLimitMonthly) {
+    if (usageCount >= requestLimit) {
       return res.status(429).json({ 
-        error: `Monthly quota exceeded. Limit: ${plan.requestLimitMonthly} requests.` 
+        error: 'Monthly quota exceeded.',
+        limit: requestLimit,
+        used: usageCount,
+        plan: subscription ? subscription.plan.name : 'Free Tier'
       });
     }
 
-    // --- All checks passed! ---
-    
-    // Update the key's last_used timestamp (fire and forget)
+    // 5. Update Last Used
+    // Fire and forget update
     prisma.apiKey.update({
       where: { id: key.id },
       data: { lastUsedAt: new Date() }
-    }).catch(err => next(err));
-    
-    // Attach user and plan info to the request for the main controller to use
+    }).catch(err => console.error('Failed to update key lastUsedAt', err));
+
+    // Attach info to request
     req.user = key.user;
     req.subscription = subscription;
-    
-    next(); // Proceed to the actual API logic (e.g., /v1/try-on)
+
+    next();
 
   } catch (error) {
-    console.error('Error in API auth middleware:', error);
-    // Don't send detailed error info to the client
+    console.error('Auth Middleware Error:', error);
     next(error);
   }
 };

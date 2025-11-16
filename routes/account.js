@@ -8,7 +8,7 @@ const prisma = require('../lib/prisma');
  * Fetches the logged-in user's account status,
  * current subscription, plan details, and usage.
  */
-router.get('/status', requireLogin, async (req, res) => {
+router.get('/status', requireLogin, async (req, res, next) => {
   try {
     // 1. Get the user and their subscription/plan details
     // req.user.id is available from the requireLogin middleware
@@ -19,6 +19,7 @@ router.get('/status', requireLogin, async (req, res) => {
         email: true,
         accountStatus: true,
         createdAt: true,
+        // We don't select verificationToken for security, just the status
         currentSubscription: {
           select: {
             id: true,
@@ -45,6 +46,7 @@ router.get('/status', requireLogin, async (req, res) => {
 
     // 2. Get the user's current usage
     let usageCount = 0;
+    // Only fetch usage if they have a valid subscription
     if (user.currentSubscription && user.currentSubscription.status === 'active') {
       // Get usage ONLY for the current billing period
       usageCount = await prisma.apiUsageLog.count({
@@ -62,15 +64,24 @@ router.get('/status', requireLogin, async (req, res) => {
     const plan = user.currentSubscription?.plan;
     const subscription = user.currentSubscription;
 
+    // Determine a user-friendly status message
+    let statusMessage = 'Active';
+    if (user.accountStatus === 'pending_verification') {
+        statusMessage = 'Pending Email Verification';
+    } else if (user.accountStatus === 'suspended') {
+        statusMessage = 'Account Suspended';
+    }
+
     res.json({
       account: {
         userId: user.id,
         email: user.email,
-        status: user.accountStatus,
+        status: user.accountStatus, // Raw status (active, pending_verification, suspended)
+        statusMessage: statusMessage, // Human readable status
         memberSince: user.createdAt,
       },
       subscription: {
-        planName: plan?.name || 'No Plan',
+        planName: plan?.name || 'Free / None',
         status: subscription?.status || 'inactive',
         periodStart: subscription?.currentPeriodStart || null,
         periodEnd: subscription?.currentPeriodEnd || null,
@@ -78,13 +89,12 @@ router.get('/status', requireLogin, async (req, res) => {
       usage: {
         requestsUsed: usageCount,
         requestLimit: plan?.requestLimitMonthly || 0,
-        requestsRemaining: (plan?.requestLimitMonthly || 0) - usageCount,
+        requestsRemaining: Math.max(0, (plan?.requestLimitMonthly || 0) - usageCount),
       },
     });
 
   } catch (error) {
     console.error('Error fetching account status:', error);
-
     next(error);
   }
 });

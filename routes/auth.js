@@ -32,7 +32,7 @@ router.post('/register', async (req, res, next) => {
       },
       // Select only the data that is safe to send back
       select: {
-        id: true,
+        // id: true,
         name: true,
         email: true,
         username: true,
@@ -129,7 +129,7 @@ router.post('/login', async (req, res, next) => {
       message: 'Login successful',
       token: token,
       user: {
-        id: user.id,
+        // id: user.id,
         name: user.name,
         email: user.email,
         role: role
@@ -152,6 +152,49 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
+
+
+
+/**
+ * GET /auth/verify-email
+ * Verifies the user's token and activates the account.
+ */
+router.get('/verify-email', async (req, res, next) => {
+    try {
+        const { token } = req.query;
+
+        if (!token) {
+            return res.status(400).json({ message: "Invalid verification link." });
+        }
+
+        // Find user with this token
+        const user = await prisma.user.findFirst({
+            where: { verificationToken: token }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: "Invalid or expired verification token." });
+        }
+
+        // Activate user and remove token
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                accountStatus: 'active',
+                verificationToken: null // Clear the token so it can't be reused
+            }
+        });
+
+        // You can redirect to a frontend success page here
+        // res.redirect('http://localhost:3000/login?verified=true');
+        
+        // For API-only testing, send JSON
+        res.status(200).json({ message: "Email verified successfully! You can now log in." });
+
+    } catch (error) {
+        next(error);
+    }
+});
 
 
 module.exports = router;

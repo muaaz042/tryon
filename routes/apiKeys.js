@@ -59,7 +59,7 @@ router.post('/', requireLogin, async (req, res, next) => {
         userId: req.user.id, // req.user.id comes from the requireLogin middleware
       },
       select: {
-        id: true,
+        // id: true,
         name: true,
         keyPrefix: true,
         createdAt: true
@@ -109,7 +109,7 @@ router.get('/', requireLogin, async (req, res, next) => {
       // IMPORTANT: Only select safe fields.
       // NEVER send the keyHash back to the client.
       select: {
-        id: true,
+        // id: true,
         name: true,
         keyPrefix: true,
         status: true,
