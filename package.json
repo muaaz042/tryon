@@ -17,6 +17,8 @@
   "description": "",
   "dependencies": {
     "@google/genai": "^1.29.1",
+    "@google/generative-ai": "^0.24.1",
+    "@openrouter/sdk": "^0.1.11",
     "@prisma/client": "^6.19.0",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",

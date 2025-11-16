@@ -81,7 +81,7 @@ const apiAuthMiddleware = async (req, res, next) => {
     
     // Default "Free Tier" limits if no active subscription
     // You can adjust these numbers
-    const FREE_TIER_LIMIT = 5; 
+    const FREE_TIER_LIMIT = 50; 
     
     if (subscription && subscription.status === 'active') {
         requestLimit = subscription.plan.requestLimitMonthly;
