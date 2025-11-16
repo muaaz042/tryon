@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto'); // Built-in Node.js module
 const { requireLogin } = require('../middleware/auth'); // Import auth middleware
-const { createApiKeySchema } = require('../validation'); // Import new schema
+const { createApiKeySchema } = require('../services/validation'); // Import new schema
 const { z } = require('zod');
 
 const router = express.Router();
@@ -29,17 +29,26 @@ function hashApiKey(apiKey) {
  * Creates a new API key for the currently logged-in user.
  * This route is protected and requires a valid JWT.
  */
-router.post('/', requireLogin, async (req, res) => {
+router.post('/', requireLogin, async (req, res, next) => {
   // 'requireLogin' has already run, so req.user is available
   
   try {
+    // DEBUG LOG: Check if user is attached
+    if (!req.user || !req.user.id) {
+      console.error("Error: req.user is missing or invalid in /api/keys");
+      return res.status(401).json({ error: "User authentication failed." });
+    }
+
     // 1. Validate request body
     const { name } = createApiKeySchema.parse(req.body);
 
     // 2. Generate a new API key
     const newApiKey = generateApiKey();
     const hashedKey = hashApiKey(newApiKey);
-    const prefix = newApiKey.substring(0, newApiKey.indexOf('_', 4) + 1); // e.g., "vto_live_"
+    
+    // Correctly extract prefix: "vto_live_" is 9 chars long. 
+    // The previous substring logic might have been fragile.
+    const prefix = 'vto_live'; 
 
     // 3. Save the *hashed* key to the database
     const savedKey = await prisma.apiKey.create({
@@ -77,12 +86,12 @@ router.post('/', requireLogin, async (req, res) => {
     // Handle potential duplicate key errors (highly unlikely)
     if (error.code === 'P2002') {
       return res.status(409).json({ 
-        message: 'A key with this prefix already exists. Please try again.'
+        message: 'A key with this prefix or hash already exists. Please try again.'
       });
     }
 
     console.error('Error creating API key:', error);
-
+    // Pass to global error handler
     next(error);
   }
 });
@@ -91,7 +100,7 @@ router.post('/', requireLogin, async (req, res) => {
  * GET /api/keys
  * Lists all API keys for the currently logged-in user.
  */
-router.get('/', requireLogin, async (req, res) => {
+router.get('/', requireLogin, async (req, res, next) => {
   try {
     const keys = await prisma.apiKey.findMany({
       where: {
@@ -115,18 +124,15 @@ router.get('/', requireLogin, async (req, res) => {
     res.json(keys);
   } catch (error) {
     console.error('Error fetching API keys:', error);
-
     next(error);
   }
 });
-
-// --- 👇 ADD THIS NEW ROUTE ---
 
 /**
  * DELETE /api/keys/:id
  * Revokes (soft-deletes) an API key.
  */
-router.delete('/:id', requireLogin, async (req, res) => {
+router.delete('/:id', requireLogin, async (req, res, next) => {
   try {
     const keyId = parseInt(req.params.id);
 
@@ -158,7 +164,6 @@ router.delete('/:id', requireLogin, async (req, res) => {
     res.status(200).json({ message: 'API key revoked successfully.' });
   } catch (error) {
     console.error('Error revoking API key:', error);
-
     next(error);
   }
 });

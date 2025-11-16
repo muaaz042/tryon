@@ -14,7 +14,7 @@ router.use(adminOnly);
  * GET /api/admin/users
  * Fetches a list of all users on the platform.
  */
-router.get('/users', async (req, res) => {
+router.get('/users', async (req, res, next) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -53,7 +53,7 @@ router.get('/users', async (req, res) => {
  * Fetches detailed information for a single user,
  * including their keys, subscriptions, and usage summary.
  */
-router.get('/users/:id', async (req, res) => {
+router.get('/users/:id', async (req, res, next) => {
   const userId = parseInt(req.params.id);
   if (isNaN(userId)) {
     return res.status(400).json({ error: 'Invalid user ID.' });
@@ -123,7 +123,7 @@ router.get('/users/:id', async (req, res) => {
  * PATCH /api/admin/users/:id/status
  * Manually changes a user's account status (e.g., suspend or activate).
  */
-router.patch('/users/:id/status', async (req, res) => {
+router.patch('/users/:id/status', async (req, res, next) => {
   const userId = parseInt(req.params.id);
   const { status } = req.body; // e.g., "active", "suspended"
 

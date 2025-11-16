@@ -81,10 +81,10 @@ app.use((err, req, res, next) => {
     });
   }
   
-  console.error('Error fetching data:', error);
+  console.error('Error fetching data:', err);
   // 2. You send a generic 500 response here
 
-  next(error);
+  next(err);
 
 });
 

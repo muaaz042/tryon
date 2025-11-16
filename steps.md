@@ -3,8 +3,8 @@
 
 <!-- STEP 2 -->
 - npx prisma migrate dev --name "initial-migration"
-
-
+<!-- Check DataBase -->
+npx prisma studio
 <!-- Test -->
 
 npm run db:reset

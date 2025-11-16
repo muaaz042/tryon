@@ -12,7 +12,7 @@ const prisma = require('../lib/prisma');
  * POST /auth/register
  * Logs in a User or an Admin
  */
-router.post('/register', async (req, res) => {
+router.post('/register', async (req, res, next) => {
   try {
     // 1. Validate the request body
     const validatedData = createUserSchema.parse(req.body);
@@ -78,7 +78,7 @@ router.post('/register', async (req, res) => {
  * POST /auth/login
  * Logs in a User or an Admin
  */
-router.post('/login', async (req, res) => {
+router.post('/login', async (req, res, next) => {
   try {
     // 1. Validate the request body
     const { email, password } = loginSchema.parse(req.body);

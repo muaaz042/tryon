@@ -16,7 +16,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
  * 'X-RapidAPI-Subscription': The name of the plan (e.g., "BASIC", "PRO").
  * 'X-RapidAPI-Event': The event type (e.g., "subscribe", "unsubscribe").
  */
-router.post('/rapidapi', express.json(), async (req, res) => {
+router.post('/rapidapi', express.json(), async (req, res, next) => {
   const rapidApiKey = req.headers['x-rapidapi-proxy-secret'];
   const event = req.headers['x-rapidapi-event'];
   const userId = req.headers['x-rapidapi-user'];

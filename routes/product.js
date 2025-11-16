@@ -24,8 +24,8 @@ const upload = multer({
 // --- Validation Schema ---
 const tryOnSchema = z.object({
   customPrompt: z.string().optional(),
-  userImageUrl: z.string().url("Invalid user image URL").optional(),
-  productImageUrl: z.string().url("Invalid product image URL").optional()
+  userImageUrl: z.string().optional(),
+  productImageUrl: z.string().optional()
 });
 
 // --- Helper Function: Get Image Data ---
@@ -79,7 +79,7 @@ router.get('/health', (req, res) => {
 router.use(apiAuthMiddleware);
 
 // 3. Virtual Try-On Route
-router.post('/try-on', upload, async (req, res) => {
+router.post('/try-on', upload, async (req, res,next) => {
   try {
     // 1. Validate inputs (body and files)
     const { customPrompt, userImageUrl, productImageUrl } = tryOnSchema.parse(req.body);
